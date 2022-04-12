@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Authors>Peter Wentworth</Authors>
+    <Description>Framework for loading texture brushes</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Textures\BeigeBrick.png" />
+    <None Remove="Textures\Brick2.png" />
+    <None Remove="Textures\BrickCloseup.png" />
+    <None Remove="Textures\DarkMono1.png" />
+    <None Remove="Textures\FiredBrick.png" />
+    <None Remove="Textures\GrayBrick.png" />
+    <None Remove="Textures\OrangeBrick.png" />
+    <None Remove="Textures\SidewalkBrick.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Extended.Wpf.Toolkit" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Textures\Brick2.png" />
+    <Resource Include="Textures\BrickCloseup.png" />
+    <Resource Include="Textures\DarkMono1.png" />
+    <Resource Include="Textures\SidewalkBrick.png" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Resource Include="Textures\BeigeBrick.png" />
+    <Resource Include="Textures\BeigeFelt.png" />
+    <Resource Include="Textures\DarkWood1.png" />
+    <Resource Include="Textures\DarkWood3.png" />
+    <Resource Include="Textures\FiredBrick.png" />
+    <Resource Include="Textures\GrayBrick.png" />
+    <Resource Include="Textures\GreenFelt.png" />
+    <Resource Include="Textures\LightBrownFelt.png" />
+    <Resource Include="Textures\LightMono1.png" />
+    <Resource Include="Textures\LightWood1.png" />
+    <Resource Include="Textures\LightWood2.png" />
+    <Resource Include="Textures\MediumWood1.png" />
+    <Resource Include="Textures\MediumWood2.png" />
+    <Resource Include="Textures\MintFelt.png" />
+    <Resource Include="Textures\OrangeBrick.png" />
+  </ItemGroup>
+
+</Project>
