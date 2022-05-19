@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -46,203 +47,57 @@ namespace BoardGenerator
         BrushManager theBrushman;
 
         Zone ZoneBrushBeingManipulated = Zone.Interior;
-        Dictionary<Zone, Brush> palette;
+    //    Dictionary<Zone, WrappedBrush> oldPalette;
+
+        Palette activePalette;
 
         Matrix playgroundTransform;  // Controls zoom and dragging / panning of rendered playground relative to the outerPanel
         Point mouseLastSeenAt;       // Used when dragging the playground around. (i.e. it looks like you are dragging the graph)
 
         IntegerUpDown pointMargin;
 
-        bool wantOverlays = true;
+        Image backgroundImageViewer;
 
-
-        ContextMenu theContextMenu;
+        ContextMenu theContextMenuFore;
+        ContextMenu theContextMenuBack;
 
         public MainWindow()
         {
             InitializeComponent();
             // First BlitsDruk Boards. I think the frame is too similar to the other wood
             theBrushman = new BrushManager();
-            theBrushman.BrushChanged += TheBrushman_BrushChanged;
-            palette = new Dictionary<Zone, Brush>()
-            {
-                  {Zone.DarkPoint,      theBrushman.GetBrushByName("darkWood1") },
-                  {Zone.LightPoint,     theBrushman.GetBrushByName("lightWood1") },
-                  {Zone.Frame,          theBrushman.GetBrushByName("LightBrownFelt") },
-                  {Zone.Interior,     theBrushman.GetBrushByName("lightMono1") },
-                  {Zone.PlayerSouth, Brushes.RosyBrown},
-                  {Zone.PlayerNorth, Brushes.Red
-                }
-            }; 
+            theBrushman.BrushChanged += brushChanged;
 
-            makeGui();
-            setupContextMenu();
+            // Set up some pre-designed options
+            List<Palette> knownPalettes = new List<Palette>();
+            knownPalettes.Add(new Palette("default", "Red", "Brown", new string[] { "LightSalmon", "LightGreen", "LightYellow", "beigefelt", "Red", "#FFA0522D" }));
+
+            knownPalettes.Add(new Palette("BlitsDruk", "Brown", "Red", new string[] { "darkWood1", "lightWood1", "lightmono1", "mediumwood1", "RosyBrown", "Red" }));
+            knownPalettes.Add(new Palette("alt 1", "Red", "Blue", new string[] { "darkWood1", "lightWood1", "lightMono1", "DarkMono1", "Red", "Blue" }));
+            knownPalettes.Add(new Palette("alt2", "Red", "Blue", new string[] { "LightSalmon", "LightGreen", "LightYellow", "beigefelt", "Red", "#FFA0522D" }));
+
+            knownPalettes.Add(new Palette("dark", "Red", "Brown", new string[] { "black", "LightCoral", "BeigeFelt", "DarkWood1", "Red", "RosyBrown" }));
+
+
+            activePalette = knownPalettes[0];
+
+            makeGui(knownPalettes);
+            theContextMenuFore = setupContextMenu(false);
+            theContextMenuBack = setupContextMenu(true);
             newBoard();
         }
 
-        private void TheBrushman_BrushChanged(object? sender, Brush e)
+        private void brushChanged(object? sender, string e)
         {
-            palette[ZoneBrushBeingManipulated] = e;
+            activePalette[ZoneBrushBeingManipulated] = e;
             newBoard();
-        }
-
-        private void setupContextMenu()
-        {
-            theContextMenu = new ContextMenu();
-            MenuItem mi = new MenuItem() { Header = "Change brush" };
-            mi.Click += (s, e) => 
-            {
-                FrameworkElement q = theContextMenu.PlacementTarget as FrameworkElement;
-                if (q.Tag != null)
-                {
-                    Zone whichZone = (Zone)q.Tag;
-                    changePaletteAt(whichZone);
-                }
-            };
-            theContextMenu.Items.Add(mi);
-        }
-
-        private void makeGui()
-        {
-            //  I prefer to build my GUI in code.
-            Menu main = new Menu() { };
-            mainGrid.Children.Add(main);
-
-            MenuItem save = new MenuItem() { Header = "Save" };
-            main.Items.Add(save);
-
-            MenuItem designs = new MenuItem() { Header = "Designs" };
-            main.Items.Add(designs);
-
-            MenuItem changeBrush = new MenuItem() { Header = "Change Brush" };
-            designs.Items.Add(changeBrush);
-
-
-            MenuItem cbDark = new MenuItem() { Header = "Dark Point" };
-            cbDark.Click += (s, e) => { changePaletteAt(Zone.DarkPoint); };
-            changeBrush.Items.Add(cbDark);
-
-
-            MenuItem cbLight = new MenuItem() { Header = "Light Point" };
-            cbLight.Click += (s, e) => { changePaletteAt(Zone.LightPoint); };
-            changeBrush.Items.Add(cbLight);
-
-            MenuItem cbFrame = new MenuItem() { Header = "Frame" };
-            cbFrame.Click += (s, e) => { changePaletteAt(Zone.Frame); };
-            changeBrush.Items.Add(cbFrame);
-
-            MenuItem cbInterior = new MenuItem() { Header = "Interior" };
-            cbInterior.Click += (s, e) => { changePaletteAt(Zone.Interior); };
-            changeBrush.Items.Add(cbInterior);
-
-            designs.Items.Add(new Separator());
-
-            MenuItem design1 = new MenuItem() { Header = "Alt 1" };
-            designs.Items.Add(design1);
-            design1.Click += (s, e) =>
-            {
-                palette[Zone.DarkPoint] = theBrushman.GetBrushByName("darkWood1");
-                palette[Zone.LightPoint] = theBrushman.GetBrushByName("lightWood1");
-                palette[Zone.Frame] = theBrushman.GetBrushByName("DarkMono1");
-                palette[Zone.Interior] = theBrushman.GetBrushByName("lightMono1");
-                newBoard();
-            };
-
-            MenuItem design2 = new MenuItem() { Header = "Alt 2" };
-            designs.Items.Add(design2);
-            design2.Click += (s, e) =>
-            {
-                palette[Zone.DarkPoint] = Brushes.LightSalmon;
-                palette[Zone.LightPoint] = Brushes.LightGreen;
-                palette[Zone.Frame] = theBrushman.GetBrushByName("DarkWood1");
-                palette[Zone.Interior] = Brushes.LightYellow;
-                newBoard();
-            };
-
-            MenuItem design3 = new MenuItem() { Header = "Alt 3" };
-            designs.Items.Add(design3);
-            design3.Click += (s, e) =>
-            {
-                palette[Zone.DarkPoint] = Brushes.Black;
-                palette[Zone.LightPoint] = Brushes.LightCoral;
-                palette[Zone.Frame] = theBrushman.GetBrushByName("DarkWood1");
-                palette[Zone.Interior] = theBrushman.GetBrushByName("BeigeFelt");
-                newBoard();
-            };
-
-            MenuItem help = new MenuItem() { Header = "Help" };
-            help.Click += Help_Click;
-            main.Items.Add(help);
-
-            MenuItem savePng = new MenuItem() { Header = "Save As png (96 dpi)" };
-            savePng.Click += (s, e) => { saveImageOfDesign(new PngBitmapEncoder(), "png", 96); };
-            save.Items.Add(savePng);
-
-            MenuItem savePngHiRes = new MenuItem() { Header = "Save As png (300 dpi)" };
-            savePngHiRes.Click += (s, e) => { saveImageOfDesign(new PngBitmapEncoder(), "png", 300); };
-            save.Items.Add(savePngHiRes);
-
-            MenuItem saveXPS = new MenuItem() { Header = "Save As XPS" };
-            saveXPS.Click += btnSaveXPS_Click;
-            save.Items.Add(saveXPS);
-
-
-            MenuItem tools = new MenuItem() { Header = "Tools" };
-            main.Items.Add(tools);
-
-            //MenuItem showPieces = new MenuItem() { Header = "Show Pieces" };
-            //showPieces.Click += (s, e) => { wantPiecesShown = !wantPiecesShown; newBoard(); };
-            //tools.Items.Add(showPieces);
-
-            //MenuItem labelPoints = new MenuItem() { Header = "Label points" };
-            //labelPoints.Click += (s, e) => { wantPointLabels = !wantPointLabels; newBoard(); };
-            //tools.Items.Add(labelPoints);
-
-
-            MenuItem offboarding = new MenuItem() { Header = "Toggle overlays annotations" };
-            offboarding.Click += (s, e) => { wantOverlays = !wantOverlays; newBoard(); };
-            tools.Items.Add(offboarding);
-            // tools.Items.Add(newGame);
-
-            //MenuItem showHide = new MenuItem() { Header = "Show / Hide debug panel" };
-            //showHide.Click += (object sender, RoutedEventArgs e) =>
-            //{ debug.Visibility = (debug.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible; };
-            //tools.Items.Add(showHide);
-
-
-            StackPanel sp = new StackPanel()
-            { Orientation = Orientation.Horizontal };
-            sp.Children.Add(new Label() { Content = "Inter-point gap" });
-            pointMargin = new IntegerUpDown() { Width = 40, Value = 12, Minimum = 0, Maximum = 30, AllowTextInput = true };
-            sp.Children.Add(pointMargin);
-            Button newGameb = new Button() { Content = "New game", Margin = new Thickness(4, 2, 4, 2) };
-            newGameb.Click += (object sender, RoutedEventArgs e) => { newBoard(); };
-            sp.Children.Add(newGameb);
-
-            main.Items.Add(sp);
-
-
-            outerPanel = new DockPanel() { Background = Brushes.LightPink, Margin = new Thickness(0, 28, 0, 0) };
-            mainGrid.Children.Add(outerPanel);
-            mainGrid.MouseDown += MainGrid_MouseDown;
-            mainGrid.MouseMove += MainGrid_MouseMove;
-            MouseWheel += Window_MouseWheel;
-            playground = new Canvas() { Name="playground", Background = Brushes.LightBlue };
-            outerPanel.Children.Add(playground);
-            double scale = 0.4;
-            this.Width = 890;
-            this.Height = 720;
-
-            playgroundTransform = new Matrix(scale, 0, 0, scale, 10, 10);
-            playground.RenderTransform = new MatrixTransform(playgroundTransform);
         }
 
         private void changePaletteAt(Zone zone)
         {
             ZoneBrushBeingManipulated = zone;
-            bool accepted = theBrushman.showPickerDialog(palette[zone]);
+            bool accepted = theBrushman.showPickerDialog(activePalette[zone]);
         }
-
 
         void newBoard()
         {
@@ -258,7 +113,7 @@ namespace BoardGenerator
 
         private void MainGrid_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
+            if (e.MiddleButton == MouseButtonState.Pressed)
             {
                 mouseLastSeenAt = e.GetPosition(outerPanel);
             }
@@ -266,7 +121,7 @@ namespace BoardGenerator
 
         private void MainGrid_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
+            if (e.MiddleButton == MouseButtonState.Pressed)
             {
                 Point mouseNowAt = e.GetPosition(outerPanel);
                 double dx = (mouseNowAt.X - mouseLastSeenAt.X);
@@ -287,9 +142,9 @@ namespace BoardGenerator
         }
         #endregion
 
-        #region Make a full board 
+        #region Make the board 
 
- 
+
         double baseWidth = (A3_Landscape_96dpi.Width - 2 * borderWidth - barWidth) / 12;
         double bdHeight = A3_Landscape_96dpi.Height;
         double bdWidth = A3_Landscape_96dpi.Width;
@@ -301,15 +156,27 @@ namespace BoardGenerator
 
         Canvas makeBoard()
         {
-            double margin = wantOverlays ? 160 : 0;
+            double margin = showOverlays.IsChecked ? 160 : 0;
 
             Canvas offBoard = new Canvas() { Name="offBoard", Width = bdWidth + 2 * margin, Height = bdHeight + 2 * margin, Background = Brushes.WhiteSmoke };
 
-            Canvas cnvs = new Canvas() { Name = "Board", Width = bdWidth, Height = bdHeight, Background = palette[Zone.Interior], ContextMenu=theContextMenu, Tag=Zone.Interior};
+          //  Canvas cnvs = new Canvas() { Name = "Board", Width = bdWidth, Height = bdHeight, Background = oldPalette[Zone.Interior].TheBrush, ContextMenu=theContextMenuBack, Tag=Zone.Interior};
+            Canvas cnvs = new Canvas() { Name = "Board", Width = bdWidth, Height = bdHeight, Background = theBrushman.GetBrushByName(activePalette[Zone.Interior]), ContextMenu = theContextMenuBack, Tag = Zone.Interior };
+
+            //// Add a background image with some transparency. get context menu clicks propagating
+            //BitmapImage bitmap = new BitmapImage();
+            //bitmap.BeginInit();
+            //bitmap.UriSource = new Uri("C:\\temp\\background.jpg");
+            //bitmap.EndInit();
+            //backgroundImageViewer = new Image() { Width = 1200, Height = 800, Source = bitmap };
+            //Canvas.SetLeft(backgroundImageViewer, 100);
+            //Canvas.SetTop(backgroundImageViewer, 200);
+            //cnvs.Children.Add(backgroundImageViewer);
+            //backgroundImageViewer.Opacity = 0.3;
 
             createBareBoard(cnvs);
 
-            if (wantOverlays)
+            if (showOverlays.IsChecked)    
             {
                 addFullBoardOverlays(cnvs);
             }
@@ -355,7 +222,8 @@ namespace BoardGenerator
             string j = $"{width / 2 + barWidth / 2},{height-borderWidth - 2} ";
             string k = $"{width / 2 - barWidth / 2},{height - borderWidth - 2} ";
             string l = $"{width / 2 - barWidth / 2},{borderWidth + 2} ";
-            Polygon p = new Polygon() { Points = PointCollection.Parse(a + b + c + d + a + e + f + g + h + ix + j + k + l + e), Fill = palette[Zone.Frame], ContextMenu = theContextMenu, Tag = Zone.Frame };
+            Polygon p = new Polygon() { Points = PointCollection.Parse(a + b + c + d + a + e + f + g + h + ix + j + k + l + e), Fill =
+                Background = theBrushman.GetBrushByName(activePalette[Zone.Frame]), ContextMenu = theContextMenuFore, Tag = Zone.Frame };
             cnvs.Children.Add(p);
         }
 
@@ -385,18 +253,18 @@ namespace BoardGenerator
             addMen(cnvs, 17, 3, Zone.PlayerNorth);
             addMen(cnvs, 19, 5, Zone.PlayerNorth);
 
-            addPointNumberingSouth(cnvs, palette[Zone.PlayerSouth], false);
-            addPointNumberingNorth(cnvs, palette[Zone.PlayerNorth], true);
+           addPointNumberingSouth(cnvs, theBrushman.GetBrushByName(activePalette[Zone.PlayerSouth]), false);
+           addPointNumberingNorth(cnvs, theBrushman.GetBrushByName(activePalette[Zone.PlayerNorth]), true);
 
             FontFamily fam = new FontFamily("Comic Sans MS");
 
-            Label innerBrown = new Label() { Content = "Brown Inner Board", FontSize = 64, FontWeight=FontWeights.DemiBold, FontFamily=fam };
+            Label innerBrown = new Label() { Content = $"{activePalette.SouthName} Inner Board", FontSize = 64, FontWeight=FontWeights.DemiBold, FontFamily=fam };
             Canvas.SetBottom(innerBrown, -150);
             Canvas.SetLeft(innerBrown, getXForPoint(6));
             cnvs.Children.Add(innerBrown);
 
 
-            Label innerRed = new Label() { Content = "Red Inner Board", FontSize = 64, FontWeight = FontWeights.DemiBold, FontFamily=fam };
+            Label innerRed = new Label() { Content = $"{activePalette.NorthName} Inner Board", FontSize = 64, FontWeight = FontWeights.DemiBold, FontFamily=fam };
             Canvas.SetTop(innerRed, -150);
             Canvas.SetLeft(innerRed, getXForPoint(1));
             innerRed.RenderTransform = new RotateTransform(180, 0, 48);
@@ -409,43 +277,6 @@ namespace BoardGenerator
             cnvs.Children.Add(bar);
         }
 
-        private void addArrow(Canvas cnvs, double x, double y, bool isLeft)
-        {
-            double w = 80;
-            double w3 = w / 2.7;
-            double h = 24;
-            double h2 = h / 2;
-            double neck = 6;
-            // Point[] thePoints = { new Point(0, 0), new Point(w3, -h), new Point(w3, -h2), new Point(w, -h2), new Point(w, h2), new Point(w3, h2), new Point(w3, h) };
-            // A bigger arrow that overlaps the piece and has a narrow neck
-            Point[] thePoints = { new Point(0, 0), new Point(w3, -h), new Point(w3-5,-neck),  
-          
-                new Point(w, -h2), new Point(w, h2),  new Point(w3-5,neck),  new Point(w3,h),
-        
-                new Point(w3, h) };
-            PointCollection pts = new PointCollection(thePoints);
-            Polygon pg = new Polygon()
-            {
-                Stroke = Brushes.Black,
-                StrokeThickness = 2,
-                Fill = Brushes.Cyan,
-                Points = pts,
-            };
-
-            Canvas.SetTop(pg, y);
-            if (isLeft)
-            {
-                Canvas.SetLeft(pg, x-w/2-10);
-            }
-            else
-            {
-                RotateTransform rt = new RotateTransform(180, 0, 0);
-                Canvas.SetLeft(pg, x+w);
-                pg.RenderTransform = rt;
-            }
-            cnvs.Children.Add(pg);
-        }
- 
         private void addPointNumberingSouth(Canvas cnvs, Brush playerBrush, bool offBoard)
         {
             double h = cnvs.Height;
@@ -507,14 +338,16 @@ namespace BoardGenerator
             }
         }
 
-
         private void addMen(Canvas cnvs, int pointNum, int numMen, Zone paletteIndex)
         {
             double x = getXForPoint(pointNum);  
             double y = pointNum >= 13 ? borderWidth : bdHeight - borderWidth - manSz;
             double ydelta = pointNum >= 13 ? manSz : -manSz;
             bool arrowLeft = paletteIndex == Zone.PlayerNorth;
-            
+
+            Brush fillBrush = theBrushman.GetBrushByName(activePalette[paletteIndex]);
+
+
             if (pointNum >= 13)
             {
                 arrowLeft = !arrowLeft;
@@ -523,14 +356,49 @@ namespace BoardGenerator
             for (int man=0; man<numMen; man++)
             {
                 Ellipse theMan = new Ellipse() { Width = manSz, Height = manSz, 
-                    Stroke = Brushes.Black, StrokeThickness=3, Fill = palette[paletteIndex],
-                    ContextMenu = theContextMenu,
+                    Stroke = Brushes.Black, StrokeThickness=3, Fill = fillBrush,
+                    ContextMenu = theContextMenuFore,
                     Tag = paletteIndex
                 };
                 Canvas.SetLeft(theMan, x-3);   // don't know why this is a little off
                 Canvas.SetTop(theMan, y);
                 cnvs.Children.Add(theMan);
-                addArrow(cnvs, x + manSz/5, y+manSz/2, arrowLeft);
+
+                bool mustAddArrow =  arrowOption == ArrowOptions.All || (arrowOption == ArrowOptions.Topmost && man == numMen - 1);
+
+                if (mustAddArrow)
+                {
+                    Matrix transform = new Matrix();
+                    if (pointNum == 12)
+                    {
+                        transform.Rotate(-45);
+                    }
+                    else if (pointNum == 13)
+                    {
+                        transform.Scale(1, -1);
+                        transform.Rotate(45);
+                    }
+                    else if (pointNum < 12)
+                    {
+                        transform.Scale(1, -1);
+                    }
+
+                    UIElement theArrow = mkArrow(fillBrush);  //  
+
+                    Canvas.SetTop(theArrow, y + manSz / 2);
+                    if (arrowLeft)
+                    {
+                        transform.Scale(-1, 1);
+                        Canvas.SetLeft(theArrow, x - 4);
+                    }
+                    else
+                    {
+                        Canvas.SetLeft(theArrow, x + manSz);
+                    }
+
+                    theArrow.RenderTransform = new MatrixTransform(transform);
+                    cnvs.Children.Add(theArrow);
+                }
                 y += ydelta;
             }
         }
@@ -545,10 +413,11 @@ namespace BoardGenerator
             {
                 Stroke = Brushes.Black,
                 StrokeThickness = 6,
-                Fill = palette[paletteZone],
+              //  Fill = oldPalette[paletteZone].TheBrush,
+                Fill = theBrushman.GetBrushByName(activePalette[paletteZone]),
                 Points = pts,
                 StrokeLineJoin = PenLineJoin.Round,
-                ContextMenu = theContextMenu,
+                ContextMenu = theContextMenuFore,
                 Tag = paletteZone
             };
 
@@ -560,10 +429,11 @@ namespace BoardGenerator
             {
                 Stroke = Brushes.LightGoldenrodYellow,
                 StrokeThickness = 2.5,
-                Fill = palette[paletteZone],
+                //   Fill = oldPalette[paletteZone].TheBrush,
+                Fill = theBrushman.GetBrushByName(activePalette[paletteZone]),
                 Points = pts,
                 StrokeLineJoin = PenLineJoin.Round,
-                ContextMenu = theContextMenu,
+                ContextMenu = theContextMenuFore,
                 Tag = paletteZone
             };
             cnvs.Children.Add(pg2);
@@ -571,90 +441,16 @@ namespace BoardGenerator
             Canvas.SetTop(pg2, top);
         }
 
-        #endregion;
-
-        private void saveImageOfDesign(BitmapEncoder encoder, string extension, double targetSaveDpi)
-        {
-            // WPF units are 96dpi based.  Larget targetSaveDpi gives better quality for professional printing
-            Cursor savedCursor = Cursor;
-            Cursor = Cursors.Wait;
-            RenderTargetBitmap rtb =
-               new RenderTargetBitmap((int)Math.Round(playground.Width * targetSaveDpi / 96.0),
-                                      (int)Math.Round(playground.Height * targetSaveDpi / 96.0),
-                                         targetSaveDpi,
-                                         targetSaveDpi,
-                                         System.Windows.Media.PixelFormats.Default);
-
-            // Ensure we remove effects of current rendering transform
-            playground.RenderTransform = new MatrixTransform();
-            Application.Current.Dispatcher.Invoke(DispatcherPriority.Background, () => { });
-
-            rtb.Render(playground);
-            encoder.Frames.Add(BitmapFrame.Create(rtb));
-            string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss"); https://docs.microsoft.com/en-us/dotnet/standard/base-types/custom-date-and-time-format-strings
-            string filename = $"C:\\temp\\Backgammon_{timestamp}.{extension}";
-            System.IO.Stream stm = System.IO.File.Create(filename);
-            encoder.Save(stm);
-            stm.Close();
-            Cursor = savedCursor;
-            System.Windows.MessageBox.Show("File saved to " + filename, "Done");
-            // Fix the playground transform back to what it should be
-            playground.RenderTransform = new MatrixTransform(playgroundTransform);
+         private UIElement mkArrow(Brush fillBrush)
+        {  // https://docs.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/path-markup-syntax?view=netframeworkdesktop-4.8
+            string arrow = "M 2,15 L 4,15 C 20,37 42,35 63,25 L58,18 90,9 79,41 72,34 C 30,50 3,37 0,20 L 2,15";     
+ 
+            Geometry pg = PathGeometry.Parse(arrow);
+            Path result = new Path() { Data = pg, Stroke = Brushes.Black, StrokeThickness = 3, Fill = fillBrush };
+            return result;
         }
 
-
-
-        private void btnSaveXPS_Click(object sender, RoutedEventArgs e)
-        {
-            // http://ericsink.com/wpf3d/B_Printing.html
-            string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-            string filename = $"C:\\temp\\Backgammon_{timestamp}.xps";
-
-            Canvas board = makeBoard();
-            Size sz = new Size(board.Width, board.Height);
-            FixedDocument doc = new FixedDocument();
-     
-            doc.DocumentPaginator.PageSize = sz;
-
-            PageContent page = new PageContent();
-            FixedPage fixedPage = CreateOneFixedPage(sz, board);
-            ((IAddChild)page).AddChild(fixedPage);
-            doc.Pages.Add(page);
-
-            XpsDocument xpsd = new XpsDocument(filename, System.IO.FileAccess.Write);
-            XpsDocumentWriter xw = XpsDocument.CreateXpsDocumentWriter(xpsd);
-            xw.Write(doc);
-            xpsd.Close();
-
-            System.Windows.MessageBox.Show("File saved to " + filename, "Done");
-        }
-
-        private FixedPage CreateOneFixedPage(Size sz, Canvas board)
-        {    
-            FixedPage page = new FixedPage();
-            page.Background = Brushes.White;
-            page.Width = sz.Width;
-            page.Height = sz.Height;
-            FixedPage.SetLeft(board, 0);
-            FixedPage.SetTop(board, 0);
-            page.Children.Add((UIElement)board);
-            page.Measure(sz);
-            page.Arrange(new Rect(new Point(), sz));
-            page.UpdateLayout();
-            return page;
-        }
-
-
-        private void Help_Click(object sender, RoutedEventArgs e)
-        {
-            string helpText =
-              //  "Right-click on point, background, or border allows you to pick another texture.\n" +
-                "\nUse the Mouse Wheel to zoom in or out." +
-                "\nDragging the mouse while holding down the Right Mouse Button moves everything.";
-
-
-            System.Windows.MessageBox.Show(helpText, "Planarity help:");
-        }
+        #endregion
 
     }
 }
